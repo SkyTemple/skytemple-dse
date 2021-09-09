@@ -108,5 +108,4 @@ venv.bak/
 .idea/
 ### skytemple
 dbg_output
-### armips
-skytemple_files/_resources/armips.exe
+dbg_output_psy
