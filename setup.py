@@ -20,7 +20,7 @@ setup(
     long_description_content_type='text/x-rst',
     url='https://github.com/SkyTemple/skytemple-dse/',
     install_requires=[
-
+        'mido >= 1.2.10'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

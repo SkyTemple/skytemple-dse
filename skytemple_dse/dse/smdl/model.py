@@ -410,7 +410,7 @@ class SmdlSpecialOpCode(Enum):
     UNK_0xDF = 0xDF, [8]
     # Params: (int8)TrackVolume
     # Change the track's volume to the value specified. (0x0-0x7F)
-    SET_TRACK_VOLUME = 0xE0, [8]
+    SET_TRACK_VOLUME = 0xE0, [-8]
     # Params: ??
     # ??
     UNK_0xE1 = 0xE1, [8]
@@ -419,7 +419,7 @@ class SmdlSpecialOpCode(Enum):
     UNK_0xE2 = 0xE2, None
     # Params: (int8)TrackExpression
     # Change the track's expression(secondary volume) to the value specified. (0x0-0x7F)
-    SET_TRACK_EXPRESSION = 0xE3, [8]
+    SET_TRACK_EXPRESSION = 0xE3, [-8]
     # Params: ??
     # ??
     UNK_0xE4 = 0xE4, [8, 8, 8, 8, 8]  # ???
@@ -434,7 +434,7 @@ class SmdlSpecialOpCode(Enum):
     UNK_0xE7 = 0xE7, [8]
     # Params: (int8)Pan
     # Change the track's pan to the value specified. (0x0-0x7F. 0x40 is middle, 0x0 full left, and 0x7F full right )
-    SET_TRACK_PAN = 0xE8, [8]
+    SET_TRACK_PAN = 0xE8, [-8]
     # Params: ??
     # ??
     UNK_0xE9 = 0xE9, None
@@ -548,6 +548,7 @@ class SmdlTrack(DseAutoString):
                 number_params = param1 >> 6
                 octave_mod = param1 >> 4 & 0x3
                 note = param1 & 0xF
+                assert note < 0xC
                 key_down_duration = None
                 if number_params > 0:
                     key_down_duration = dse_read_uintle(data, pnt, number_params)
@@ -570,8 +571,11 @@ class SmdlTrack(DseAutoString):
                     params = []
                     for param_length in op_code.parameters:
                         param_length //= 8
-                        params.append(dse_read_uintle(data, pnt, param_length))
-                        pnt += param_length
+                        if param_length > 0:
+                            params.append(dse_read_uintle(data, pnt, param_length))
+                        else:
+                            params.append(dse_read_sintle(data, pnt, param_length * -1))
+                        pnt += abs(param_length)
 
                     self.events.append(SmdlEventSpecial(op_code, params))
 
