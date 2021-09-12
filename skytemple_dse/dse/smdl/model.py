@@ -125,6 +125,9 @@ class SmdlEventPlayNote(DseAutoString):
         self.note = note
         self.key_down_duration = key_down_duration
 
+    def __str__(self):
+        return f"PLAY_NOTE: {self.note.value} oct {self.octave_mod} at v{self.velocity} for {self.key_down_duration}"
+
 
 class SmdlPause(Enum):
     HALF_NOTE = 0x80, 96
@@ -163,347 +166,47 @@ class SmdlEventPause(DseAutoString):
     def __init__(self, value: SmdlPause):
         self.value = value
 
+    def __str__(self):
+        return f"DELTA_TIME: {self.value.length} ticks"
+
 
 class SmdlSpecialOpCode(Enum):
-    # Params: -
-    # Pause the track processing for the duration of the last pause.(Includes fixed duration pauses)
-    REPEAT_LAST_PAUSE = 0x90, []
-    # Params: (uint8)Duration
-    # Pause the track processing for the duration of the last pause + the duration in ticks specified.
-    # (Includes fixed duration pauses)
-    ADD_TO_LAST_PAUSE = 0x91, [8]
-    # Params: (uint8)Duration
-    # Pause the track processing for the duration in ticks.
-    PAUSE8_BITS = 0x92, [8]
-    # Params: (uint16)Duration
-    # Pause the track processing for the duration in ticks.
-    PAUSE16_BITS = 0x93, [16]
-    # Params: (uint24)Duration
-    # Pause the track processing for the duration in ticks.
-    PAUSE24_BITS = 0x94, [24]
-    # Params: (uint8)CheckInterval
-    # Pause the track processing as long as a note is held down. Will wait for at least "CheckInterval" ticks,
-    # then checks every "CheckInterval" ticks if all notes have been released on the current track.
-    PAUSE_UNTIL_RELEASE = 0x95, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0x96 = 0x96, []
-    # Params: -
-    # Disable current track.
-    INVALID_0x97 = 0x97, []
-    # Params: -
-    # Marks the end of the track. Is also used as padding to align the end of the track on 4 bytes.
-    END_OF_TRACK = 0x98, []
-    # Params: -
-    # Marks the point the track will loop to after the end of track is reached.
-    LOOP_POINT = 0x99, []
-    # Params: -
-    # Disable current track.
-    INVALID_0x9A = 0x9A, []
-    # Params: -
-    # Disable current track.
-    INVALID_0x9B = 0x9B, []
-    # Params: ??
-    # ??
-    UNK_0x9C = 0x9C, [8]
-    # Params: ??
-    # ??
-    UNK_0x9D = 0x9D, None
-    # Params: ??
-    # ??
-    UNK_0x9E = 0x9E, []
-    # Params: -
-    # Disable current track.
-    INVALID_0x9F = 0x9F, []
-    # Params: (uint8)Octave
-    # Sets the current track's octave to the value specified. Valid range is 0 - 9.
-    SET_TRACK_OCTAVE = 0xA0, [8]
-    # Params: (uint8)Octave
-    # Adds the value specified to the current track octave.
-    ADD_TO_TRACK_OCTAVE = 0xA1, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xA2 = 0xA2, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xA3 = 0xA3, []
-    # Params: (uint8)TempoBPM
-    # Sets the track's tempo in beats per minute.
-    SET_TEMPO = 0xA4, [8]
-    # Params: (uint8)TempoBPM
-    # Sets the track's tempo in beats per minute? (The code is identical to 0xA4)
-    SET_TEMPO2 = 0xA5, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xA6 = 0xA6, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xA7 = 0xA7, []
-    # Params: ??
-    # ??
-    UNK_0xA8 = 0xA8, [8, 8]
-    # Params: (uint8)???
-    # Set that first unknown value from the track's header
-    SET_UNK1 = 0xA9, [8]
-    # Params: (uint8)???
-    # Set that first unknown value from the track's header
-    SET_UNK2 = 0xAA, [8]
-    # Params: -
-    # Skips the next byte in the track.
-    SKIP_NEXT_BYTE = 0xAB, []
-    # Params: (uint8)ProgramID
-    # Change the track's program(Instrument Preset) to the one specified.
-    SET_PROGRAM = 0xAC, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xAD = 0xAD, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xAE = 0xAE, []
-    # Params: ??
-    # ??
-    UNK_0xAF = 0xAF, None
-    # Params: ??
-    # ??
-    UNK_0xB0 = 0xB0, []
-    # Params: ??
-    # ??
-    UNK_0xB1 = 0xB1, [8]
-    # Params: ??
-    # ??
-    UNK_0xB2 = 0xB2, None
-    # Params: ??
-    # Params: ??
-    # ??
-    UNK_0xB3 = 0xB3, None
-    # Params: ??
-    # ??
-    UNK_0xB4 = 0xB4, [8, 8]
-    # Params: ??
-    # ??
-    UNK_0xB5 = 0xB5, None
-    # Params: ??
-    # ??
-    UNK_0xB6 = 0xB6, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xB7 = 0xB7, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xB8 = 0xB8, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xB9 = 0xB9, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xBA = 0xBA, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xBB = 0xBB, []
-    # Params: ??
-    # ??
-    UNK_0xBC = 0xBC, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xBD = 0xBD, []
-    # Params: ??
-    # ??
-    SET_MODULATION = 0xBE, [8]
-    # Params: ??
-    # ??
-    UNK_0xBF = 0xBF, [8]
-    # Params: ??
-    # ??
-    UNK_0xC0 = 0xC0, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC1 = 0xC1, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC2 = 0xC2, []
-    # Params: ??
-    # ??
-    UNK_0xC3 = 0xC3, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xC4 = 0xC4, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC5 = 0xC5, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC6 = 0xC6, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC7 = 0xC7, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC8 = 0xC8, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xC9 = 0xC9, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xCA = 0xCA, []
-    # Params: -
-    # Skip the next 2 bytes in the track.
-    SKIP_NEXT2_BYTES = 0xCB, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xCC = 0xCC, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xCD = 0xCD, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xCE = 0xCE, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xCF = 0xCF, []
-    # Params: ??
-    # ??
-    UNK_0xD0 = 0xD0, [8]
-    # Params: ??
-    # ??
-    UNK_0xD1 = 0xD1, [8]
-    # Params: ??
-    # ??
-    UNK_0xD2 = 0xD2, [8]
-    # Params: ??
-    # ??
-    UNK_0xD3 = 0xD3, [8, 8]
-    # Params: ??
-    # ??
-    UNK_0xD4 = 0xD4, [8, 8, 8]
-    # Params: ??
-    # ??
-    UNK_0xD5 = 0xD5, [8, 8]
-    # Params: ??
-    # ??
-    UNK_0xD6 = 0xD6, [8, 8]
-    # Params: (uint16)Bend
-    # Bend the pitch of the note.
-    PITCH_BEND = 0xD7, [16]
-    # Params: ??
-    # ??
-    UNK_0xD8 = 0xD8, [8, 8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xD9 = 0xD9, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xDA = 0xDA, []
-    # Params: ??
-    # ??
-    UNK_0xDB = 0xDB, [8]
-    # Params: ??
-    # ??
-    UNK_0xDC = 0xDC, [8, 8, 8, 8, 8]  # ???
-    # Params: ??
-    # ??
-    UNK_0xDD = 0xDD, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xDE = 0xDE, []
-    # Params: ??
-    # ??
-    UNK_0xDF = 0xDF, [8]
-    # Params: (int8)TrackVolume
-    # Change the track's volume to the value specified. (0x0-0x7F)
-    SET_TRACK_VOLUME = 0xE0, [-8]
-    # Params: ??
-    # ??
-    UNK_0xE1 = 0xE1, [8]
-    # Params: ??
-    # ??
-    UNK_0xE2 = 0xE2, None
-    # Params: (int8)TrackExpression
-    # Change the track's expression(secondary volume) to the value specified. (0x0-0x7F)
-    SET_TRACK_EXPRESSION = 0xE3, [-8]
-    # Params: ??
-    # ??
-    UNK_0xE4 = 0xE4, [8, 8, 8, 8, 8]  # ???
-    # Params: ??
-    # ??
-    UNK_0xE5 = 0xE5, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xE6 = 0xE6, []
-    # Params: ??
-    # ??
-    UNK_0xE7 = 0xE7, [8]
-    # Params: (int8)Pan
-    # Change the track's pan to the value specified. (0x0-0x7F. 0x40 is middle, 0x0 full left, and 0x7F full right )
-    SET_TRACK_PAN = 0xE8, [-8]
-    # Params: ??
-    # ??
-    UNK_0xE9 = 0xE9, None
-    # Params: ??
-    # ??
-    UNK_0xEA = 0xEA, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xEB = 0xEB, []
-    # Params: ??
-    # ??
-    UNK_0xEC = 0xEC, [8, 8, 8, 8, 8]  # TODO: ???
-    # Params: ??
-    # ??
-    UNK_0xED = 0xED, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xEE = 0xEE, []
-    # Params: ??
-    # ??
-    UNK_0xEF = 0xEF, None
-    # Params: ??
-    # ??
-    UNK_0xF0 = 0xF0, [8, 8, 8, 8, 8]  # TODO: ???
-    # Params: ??
-    # ??
-    UNK_0xF1 = 0xF1, None
-    # Params: ??
-    # ??
-    UNK_0xF2 = 0xF2, None
-    # Params: ??
-    # ??
-    UNK_0xF3 = 0xF3, None
-    # Params: -
-    # Disable current track.
-    INVALID_0xF4 = 0xF4, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xF5 = 0xF5, []
-    # Params: ??
-    # ??
-    UNK_0xF6 = 0xF6, [8]
-    # Params: -
-    # Disable current track.
-    INVALID_0xF7 = 0xF7, []
-    # Params: -
-    # Skips the next 2 bytes in the track.
-    SKIP_NEXT2_BYTES2 = 0xF8, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xF9 = 0xF9, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFA = 0xFA, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFB = 0xFB, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFC = 0xFC, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFD = 0xFD, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFE = 0xFE, []
-    # Params: -
-    # Disable current track.
-    INVALID_0xFF = 0xFF, []
+    WAIT_AGAIN = 0x90, 0
+    WAIT_ADD = 0x91, 1
+    WAIT_1BYTE = 0x92, 1
+    WAIT_2BYTE = 0x93, 2  # LE
+    TRACK_END = 0x98, 0
+    LOOP_POINT = 0x99, 0
+    SET_OCTAVE = 0xA0, 1
+    SET_TEMPO = 0xA4, 1
+    SET_SAMPLE = 0xAC, 1
+    SET_MODU = 0xBE, 1
+    SET_BEND = 0xD7, 2
+    SET_VOLUME = 0xE0, 1
+    SET_XPRESS = 0xE3, 1
+    SET_PAN = 0xE8, 1
+    NA_NOTE = 0x00, -1
+    NA_DELTATIME = 0x80, 1
+    UNK_9C = 0x9C, 1
+    UNK_9D = 0x9D, 0
+    UNK_A8 = 0xA8, 2
+    UNK_A9 = 0xA9, 1
+    UNK_AA = 0xAA, 1
+    UNK_B2 = 0xB2, 1
+    UNK_B4 = 0xB4, 2
+    UNK_B5 = 0xB5, 1
+    UNK_BF = 0xBF, 1
+    UNK_C0 = 0xC0, 0
+    UNK_D0 = 0xD0, 1
+    UNK_D1 = 0xD1, 1
+    UNK_D2 = 0xD2, 1
+    UNK_D4 = 0xD4, 3
+    UNK_D6 = 0xD6, 2
+    UNK_DB = 0xDB, 1
+    UNK_DC = 0xDC, 5
+    UNK_E2 = 0xE2, 3
+    UNK_EA = 0xEA, 3
+    UNK_F6 = 0xF6, 1
 
     def __new__(cls, *args, **kwargs):
         obj = object.__new__(cls)
@@ -512,10 +215,9 @@ class SmdlSpecialOpCode(Enum):
 
     # ignore the first param since it's already set by __new__
     def __init__(
-            self, _: str, parameters: Optional[List[int]]
+            self, _: str, parameters: int
     ):
-        # List of parameters, number represents bit length (8, 16, 32). If negative: signed
-        # If the object is None instead: Unknown OP
+        # Number of parameters
         self.parameters = parameters
 
 
@@ -523,6 +225,37 @@ class SmdlEventSpecial(DseAutoString):
     def __init__(self, op: SmdlSpecialOpCode, params: List[int]):
         self.op = op
         self.params = params
+        
+    def __str__(self):
+        amt = 0
+        if len(self.params) >= 1:
+            amt = self.params[0]
+
+        if self.op == SmdlSpecialOpCode.SET_BEND:
+            amt |= ((self.params[1] & 0xFF) << 8)
+            # amt = (int)((short)amt)
+            return f"PITCH_BEND: {amt} cents"
+        elif self.op == SmdlSpecialOpCode.SET_MODU:
+            return f"SET_MOD: {amt}"
+        elif self.op == SmdlSpecialOpCode.SET_OCTAVE:
+            return f"SET_OCTAVE: {amt}"
+        elif self.op == SmdlSpecialOpCode.SET_PAN:
+            return f"SET_PAN: 0x{amt:02x}"
+        elif self.op == SmdlSpecialOpCode.SET_SAMPLE:
+            return f"CHANGE_PROGRAM: {amt}"
+        elif self.op == SmdlSpecialOpCode.SET_TEMPO:
+            return f"CHANGE_TEMPO: {amt} bpm"
+        elif self.op == SmdlSpecialOpCode.SET_VOLUME:
+            return f"SET_VOLUME: {amt}"
+        elif self.op == SmdlSpecialOpCode.SET_XPRESS:
+            return f"SET_EXPRESSION: {amt}"
+        elif self.op == SmdlSpecialOpCode.WAIT_1BYTE:
+            return f"WAIT_1BYTE: {amt} ticks"
+        elif self.op == SmdlSpecialOpCode.WAIT_2BYTE:
+            amt |= ((self.params[1] & 0xFF) << 8)
+            return f"WAIT_2BYTE: {amt} ticks"
+        else:
+            return self.op.name
 
 
 SmdlEvent = Union[SmdlEventSpecial, SmdlEventPause, SmdlEventPlayNote]
@@ -542,54 +275,42 @@ class SmdlTrack(DseAutoString):
             pnt += 1
             if op_code <= SmdlEventPlayNote.MAX:
                 velocity = op_code
-                pnt += 1
                 param1 = dse_read_uintle(data, pnt)
                 pnt += 1
-                number_params = param1 >> 6
-                octave_mod = param1 >> 4 & 0x3
+                number_params = (param1 >> 6) & 0x3
+                octave_mod = ((param1 >> 4) & 0x3) - 2
                 note = param1 & 0xF
-                assert note < 0xC
-                key_down_duration = None
+                #assert note < 0xC
+                assert number_params < 4
+                key_down_duration = -1
                 if number_params > 0:
-                    key_down_duration = dse_read_uintle(data, pnt, number_params)
+                    # todo: big endian?? really??
+                    key_down_duration = dse_read_uintbe(data, pnt, number_params)
                 pnt += number_params
                 self.events.append(SmdlEventPlayNote(velocity, octave_mod, SmdlNote(note), key_down_duration))
             elif op_code <= SmdlEventPause.MAX:
                 self.events.append(SmdlEventPause(SmdlPause(op_code)))
+            elif op_code == 0xAB:  # skip byte
+                pnt += 1
+            elif op_code == 0xCB or op_code == 0xF8:  # skip 2 bytes
+                pnt += 2
             else:
                 op_code = SmdlSpecialOpCode(op_code)
-                if op_code == SmdlSpecialOpCode.SKIP_NEXT_BYTE:
+                params = []
+                for i in range(0, op_code.parameters):
+                    params.append(dse_read_uintle(data, pnt))
                     pnt += 1
-                    continue
-                elif op_code == SmdlSpecialOpCode.SKIP_NEXT2_BYTES or op_code == SmdlSpecialOpCode.SKIP_NEXT2_BYTES2:
-                    pnt += 2
-                    continue
-                elif op_code.parameters is None:
-                    warnings.warn(f"SMDL: Unknown operation: {op_code}")
-                    self.events.append(SmdlEventSpecial(op_code, []))
-                else:
-                    params = []
-                    for param_length in op_code.parameters:
-                        param_length //= 8
-                        if param_length > 0:
-                            params.append(dse_read_uintle(data, pnt, param_length))
-                        else:
-                            params.append(dse_read_sintle(data, pnt, param_length * -1))
-                        pnt += abs(param_length)
 
-                    self.events.append(SmdlEventSpecial(op_code, params))
+                self.events.append(SmdlEventSpecial(op_code, params))
 
             if pnt > length:
                 raise ValueError("Tried to read past EOF while reading SMDL track data")
-
-        assert isinstance(self.events[len(self.events) - 1], SmdlEventSpecial) and \
-               self.events[len(self.events) - 1].op == SmdlSpecialOpCode.END_OF_TRACK
 
         # Padding
         padding_needed = (4 - (length % 4))
         if 0 < padding_needed < 4:
             for i in range(length, length + padding_needed):
-                assert dse_read_uintle(data, i) == SmdlSpecialOpCode.END_OF_TRACK.value
+                assert dse_read_uintle(data, i) == SmdlSpecialOpCode.TRACK_END.value
 
 
 class Smdl:

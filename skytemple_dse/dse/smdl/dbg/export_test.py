@@ -38,17 +38,6 @@ for filename in get_files_from_rom_with_extension(rom, 'smd'):
             continue
         print(filename)
         model = Smdl(rom.getFileByName(filename))
-        # print(model)
-
-        print("====")
-        print(model.header)
-        print(model.song)
-
-        for track in model.tracks:
-            print("---")
-            print(track.header)
-            for event in track.events:
-                print(event)
 
     except:
         traceback.print_exc()

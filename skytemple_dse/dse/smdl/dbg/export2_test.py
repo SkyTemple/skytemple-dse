@@ -26,24 +26,18 @@ from ndspy.rom import NintendoDSRom
 from skytemple_files.common.util import get_files_from_rom_with_extension
 
 from skytemple_dse.dse.smdl.model import Smdl
-from skytemple_dse.midi.smdl_to_midi import smdl_to_midi
 
-base_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
+base_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..')
 output_dir = os.path.join(os.path.dirname(__file__), 'dbg_output')
 os.makedirs(output_dir, exist_ok=True)
 rom = NintendoDSRom.fromFile(os.path.join(base_dir, 'skyworkcopy.nds'))
 
-for filename in get_files_from_rom_with_extension(rom, 'smd'):
-    try:
-        if not filename.startswith("SOUND"):
-            continue
-        print(filename)
-        model = Smdl(rom.getFileByName(filename))
-    except:
-        print("Skipped (read error).")
-        continue
-        #traceback.print_exc()
+filename = 'SOUND/BGM/bgm0001.smd'
+print(filename)
+model = Smdl(rom.getFileByName(filename))
+# print(model)
 
-    midi = smdl_to_midi(model)
-    print("-> " + midi.filename)
-    midi.save(os.path.join(output_dir, midi.filename + '.mid'))
+for track in model.tracks:
+    print("=====")
+    for event in track.events:
+        print(event)

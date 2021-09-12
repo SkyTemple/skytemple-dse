@@ -14,219 +14,189 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
+from typing import Tuple, Dict, Iterable
+
 from mido import MidiFile, MidiTrack, Message, MetaMessage, bpm2tempo
+from mido.messages import BaseMessage
 
 from skytemple_dse.dse.smdl.model import *
+LOOP_POINT = "Loop Point"
 
 
-def smdl_note_to_midi(note: SmdlNote, current_octave: int, octave_mod: int):
-    base = 60
-    octave_mod -= 2
-    return note.value + base + ((octave_mod + current_octave) * 12)
+class MidiWriteState:
+    def __init__(self, channel: int):
+        self.tick_current = 0
+        self.oct_current = 0
+        self.last_note_len = 0
+        self.last_wait_time = 0
+        self.channel = channel
+
+
+def smdl_note_to_midi(note: SmdlNote, octave: int):
+    m_note = note.value + (octave * 12)
+    # Right now just clips values. Probably should have a more elegant way to handle.
+    if m_note < 0:
+        return 0
+    if m_note > 127:
+        return 127
+    return m_note
+
+
+class TimedContainer:
+    """mido uses relative timings... SMDL doesn't work like this. This container stores them absolutely and then
+    returns them as messages in relative order, with relative time attributes."""
+    def __init__(self):
+        self.container: Dict[int, List[BaseMessage]] = {}
+
+    def append(self, time: int, message: BaseMessage):
+        if time not in self.container:
+            self.container[time] = []
+        self.container[time].append(message)
+
+    def __iter__(self) -> Iterable[BaseMessage]:
+        prev_time = 0
+        for time, msgs in sorted(self.container.items(), key=lambda item: item[0]):
+            first = msgs.pop(0)
+            first.time = time - prev_time
+            prev_time += first.time
+            yield first
+            for msg in msgs:
+                msg.time = 0
+                yield msg
+
+
+def _read_note(event: SmdlEventPlayNote, track: TimedContainer, state: MidiWriteState):
+    midi_note = smdl_note_to_midi(event.note, state.oct_current + event.octave_mod)
+    n_length = event.key_down_duration
+    if n_length < 0:
+        n_length = state.last_note_len
+    off_time = state.tick_current + n_length
+    track.append(state.tick_current, Message('note_on', note=midi_note, channel=state.channel, velocity=event.velocity))
+    track.append(off_time, Message('note_off', note=midi_note, channel=state.channel, velocity=event.velocity))
+
+    state.oct_current = state.oct_current + event.octave_mod
+    state.last_note_len = n_length
+
+
+def _read_delta_time(event: SmdlEventPause, state: MidiWriteState):
+    state.tick_current += event.value.length
+
+
+def _read_loop_point_event(track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, MetaMessage('marker', text='loop'))
+
+
+def _read_pitch_bend_set(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    chan = state.channel
+    sh = event.params[0]
+    sl = event.params[1]
+    bend = ((sh << 8) | sl) >> 2
+    bend -= 16384 // 2
+    track.append(state.tick_current, Message('pitchwheel', pitch=bend, channel=chan))
+
+
+def _read_mod_wheel_change(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, Message('control_change', control=1, value=event.params[0], channel=state.channel))
+
+
+def _read_octave_set(event: SmdlEventSpecial, state: MidiWriteState):
+    state.oct_current = event.params[0]
+
+
+def _read_pan_change(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, Message('control_change', control=10, value=event.params[0], channel=state.channel))
+
+
+def _read_program_change(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, Message('program_change', program=event.params[0], channel=state.channel))
+
+
+def _read_tempo_set(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    mspq = 60000000 // event.params[0]
+    track.append(state.tick_current, MetaMessage('set_tempo', tempo=mspq))
+
+
+def _read_volume_set(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, Message('control_change', control=7, value=event.params[0], channel=state.channel))
+
+
+def _read_expression_set(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    track.append(state.tick_current, Message('control_change', control=11, value=event.params[0], channel=state.channel))
+
+
+def _read_track_end_event(track: TimedContainer,  state: MidiWriteState):
+    track.append(state.tick_current, MetaMessage('end_of_track'))
+
+
+def _read_wait_event(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    if event.op == SmdlSpecialOpCode.WAIT_1BYTE:
+        wait_time = event.params[0]
+    elif event.op == SmdlSpecialOpCode.WAIT_2BYTE:
+        wait_time = event.params[1]
+        wait_time <<= 8
+        wait_time |= event.params[0] & 0xFF
+    elif event.op == SmdlSpecialOpCode.WAIT_ADD:
+        wait_time = state.last_wait_time + event.params[0]
+    elif event.op == SmdlSpecialOpCode.WAIT_AGAIN:
+        wait_time = state.last_wait_time
+
+    state.tick_current += wait_time
+    state.last_wait_time = wait_time
+
+
+def _read_unknown_event(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    params = ""
+    for p in event.params:
+        params += f"0x{p:02x} "
+    track.append(state.tick_current, MetaMessage('marker', text=f'UNK 0x{event.op.value:02x} {params}'))
 
 
 def smdl_to_midi(smdl: Smdl) -> MidiFile:
-    # i have no idea what i'm doing. let's go!!!
-    current_octave = 0
-    last_pause_time = 0
-    tick = 0
-    mid = MidiFile()
+    mid = MidiFile(ticks_per_beat=smdl.song.tpqn)
+    mid.filename = smdl.header.file_name
     for track in smdl.tracks:
         midi_track = MidiTrack()
+        timed_track = TimedContainer()
+        state = MidiWriteState(track.preamble.channel_id)
         mid.tracks.append(midi_track)
         for event in track.events:
             if isinstance(event, SmdlEventPlayNote):
-                # TODO: ??? What if not specified?
-                held_time = event.key_down_duration if event.key_down_duration is not None else 0
-                note = smdl_note_to_midi(event.note, current_octave, event.octave_mod)
-                midi_track.append(Message('note_on', note=note, velocity=event.velocity, time=tick))
-                tick += held_time
-                midi_track.append(Message('note_off', note=note, velocity=event.velocity, time=tick))
+                _read_note(event, timed_track, state)
             elif isinstance(event, SmdlEventPause):
-                last_pause_time = event.value.length
-                tick += last_pause_time
+                _read_delta_time(event, state)
             elif isinstance(event, SmdlEventSpecial):
-                if event.op == SmdlSpecialOpCode.REPEAT_LAST_PAUSE:
-                    tick += last_pause_time
-                elif event.op == SmdlSpecialOpCode.ADD_TO_LAST_PAUSE:
-                    last_pause_time += event.params[0]
-                    tick += last_pause_time
-                elif event.op == SmdlSpecialOpCode.PAUSE8_BITS \
-                        or event.op == SmdlSpecialOpCode.PAUSE16_BITS \
-                        or event.op == SmdlSpecialOpCode.PAUSE24_BITS:
-                    last_pause_time = event.params[0]
-                    tick += last_pause_time
-                elif event.op == SmdlSpecialOpCode.PAUSE_UNTIL_RELEASE:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.END_OF_TRACK:
-                    midi_track.append(MetaMessage('end_of_track'))
-                elif event.op == SmdlSpecialOpCode.LOOP_POINT:
-                    # todo
-                    midi_track.append(MetaMessage('marker', text='loop'))
-                elif event.op == SmdlSpecialOpCode.UNK_0x9C:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0x9D:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0x9E:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_TRACK_OCTAVE:
-                    current_octave = event.params[0]
-                elif event.op == SmdlSpecialOpCode.ADD_TO_TRACK_OCTAVE:
-                    current_octave += event.params[0]
-                elif event.op == SmdlSpecialOpCode.SET_TEMPO or event.op == SmdlSpecialOpCode.SET_TEMPO2:
-                    midi_track.append(MetaMessage('set_tempo', tempo=bpm2tempo(event.params[0])))
-                elif event.op == SmdlSpecialOpCode.UNK_0xA8:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_UNK1:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_UNK2:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SKIP_NEXT_BYTE:
-                    raise ValueError("Meta opcode should not exist.")
-                elif event.op == SmdlSpecialOpCode.SET_PROGRAM:
-                    midi_track.append(Message('program_change', program=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xAF:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB0:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB1:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB2:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB3:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB4:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB5:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xB6:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xBC:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_MODULATION:
-                    midi_track.append(Message('control_change', control=1, value=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xBF:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xC0:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xC3:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SKIP_NEXT2_BYTES:
-                    raise ValueError("Meta opcode should not exist.")
-                elif event.op == SmdlSpecialOpCode.UNK_0xD0:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD1:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD2:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD3:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD4:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD5:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xD6:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.PITCH_BEND:
-                    # TODO
-                    warnings.warn(f'Not implemented: {event.op}')
-                    continue
-                    midi_track.append(Message('pitchwheel', pitch=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xD8:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xDB:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xDC:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xDD:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xDF:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_TRACK_VOLUME:
-                    midi_track.append(Message('control_change', control=7, value=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xE1:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xE2:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_TRACK_EXPRESSION:
-                    midi_track.append(Message('control_change', control=11, value=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xE4:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xE5:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xE7:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SET_TRACK_PAN:
-                    midi_track.append(Message('control_change', control=10, value=event.params[0], time=tick))
-                elif event.op == SmdlSpecialOpCode.UNK_0xE9:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xEA:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xEC:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xED:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xEF:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xF0:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xF1:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xF2:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xF3:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.UNK_0xF6:
-                    # todo
-                    warnings.warn(f'Not implemented: {event.op}')
-                elif event.op == SmdlSpecialOpCode.SKIP_NEXT2_BYTES2:
-                    raise ValueError("Meta opcode should not exist.")
+                if event.op == SmdlSpecialOpCode.LOOP_POINT:
+                    _read_loop_point_event(timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_BEND:
+                    _read_pitch_bend_set(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_MODU:
+                    _read_mod_wheel_change(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_OCTAVE:
+                    _read_octave_set(event, state)
+                elif event.op == SmdlSpecialOpCode.SET_PAN:
+                    _read_pan_change(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_SAMPLE:
+                    _read_program_change(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_TEMPO:
+                    _read_tempo_set(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_VOLUME:
+                    _read_volume_set(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_XPRESS:
+                    _read_expression_set(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.TRACK_END:
+                    _read_track_end_event(timed_track, state)
+                elif event.op == SmdlSpecialOpCode.WAIT_1BYTE:
+                    _read_wait_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.WAIT_2BYTE:
+                    _read_wait_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.WAIT_ADD:
+                    _read_wait_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.WAIT_AGAIN:
+                    _read_wait_event(event, timed_track, state)
                 else:
-                    raise ValueError(f"Invalid code: {event.op}")
+                    _read_unknown_event(event, timed_track, state)
+
+        for entry in timed_track:
+            midi_track.append(entry)
 
     return mid

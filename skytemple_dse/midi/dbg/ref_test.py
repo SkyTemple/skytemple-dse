@@ -16,7 +16,8 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 from mido import MidiFile
 
-mid = MidiFile('/tmp/test.mid')
+#mid = MidiFile('/tmp/B_SYS_P3_OPENIN.mid')
+mid = MidiFile('/home/marco/dev/skytemple/skytemple/dse/skytemple_dse/midi/dbg/dbg_output/SOUND_BGM_bgm0001.smd.mid')
 
 for track in mid.tracks:
     print("TRACK")
