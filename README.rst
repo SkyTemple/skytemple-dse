@@ -33,6 +33,8 @@ SkyTemple DSE
     :target: https://ko-fi.com/I2I81E5KH
     :alt: Ko-Fi
 
-TODO
+Python library for working with a specific version of compiled DSE sound engine files.
+
+README is TODO.
 
 |kofi|
