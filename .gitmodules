@@ -1,0 +1,3 @@
+[submodule "swig/src"]
+	path = swig/src
+	url = https://github.com/gocha/sf2cute
