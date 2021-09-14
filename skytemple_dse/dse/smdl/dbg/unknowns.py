@@ -26,28 +26,17 @@ from ndspy.rom import NintendoDSRom
 from skytemple_files.common.util import get_files_from_rom_with_extension
 
 from skytemple_dse.dse.smdl.model import Smdl
-from skytemple_dse.dse.smdl.writer import SmdlWriter
 
 base_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..')
 output_dir = os.path.join(os.path.dirname(__file__), 'dbg_output')
 os.makedirs(output_dir, exist_ok=True)
 rom = NintendoDSRom.fromFile(os.path.join(base_dir, 'skyworkcopy.nds'))
 
+
 for filename in get_files_from_rom_with_extension(rom, 'smd'):
     if not filename.startswith("SOUND"):
         continue
     print(filename)
-    model_bytes = rom.getFileByName(filename)
-    model = Smdl(model_bytes)
-    after_bytes = SmdlWriter(model).write()
+    model = Smdl(rom.getFileByName(filename))
 
-    try:
-        assert model_bytes == after_bytes
-    except:
-        with open('/tmp/before.bin', 'wb') as f:
-            f.write(model_bytes)
-        with open('/tmp/after.bin', 'wb') as f:
-            f.write(after_bytes)
-        os.system('xxd /tmp/before.bin > /tmp/before.bin.hex')
-        os.system('xxd /tmp/after.bin > /tmp/after.bin.hex')
-        raise
+    print(model.header.file_name)

@@ -21,7 +21,7 @@ from skytemple_dse.dse.common.string import DseFilenameString
 from skytemple_dse.dse.swdl.kgrp import SwdlKgrp
 from skytemple_dse.dse.swdl.pcmd import SwdlPcmd
 from skytemple_dse.dse.swdl.prgi import SwdlPrgi
-from skytemple_dse.dse.swdl.wavi import SwdlWavi
+from skytemple_dse.dse.swdl.wavi import SwdlWavi, SwdlPcmdReference
 from skytemple_dse.util import *
 LEN_HEADER = 80
 
@@ -107,9 +107,8 @@ class Swdl:
             for sample in self.wavi.sample_info_table:
                 if sample:
                     offs, length = sample.get_initial_sample_pos(), sample.sample_length
-                    assert offs+length < len(pcmd.chunk_data), "Invalid Swdl sample data"
-                    assert offs+length < len(pcmd.chunk_data), "Invalid Swdl sample data"
-                    sample.sample = bytes(pcmd.chunk_data[offs:offs+length])  # better to copy here
+                    assert offs+length <= len(pcmd.chunk_data), "Invalid Swdl sample data"
+                    sample.sample = SwdlPcmdReference(pcmd, offs, length)
 
     def __str__(self):
         return f"""SWDL <<{self.header}>>:

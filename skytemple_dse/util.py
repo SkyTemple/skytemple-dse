@@ -85,6 +85,13 @@ def dse_write_sintbe(data: bytes, to_write: int, start=0, length=1):
     data[start:start + length] = to_write.to_bytes(length, byteorder='big', signed=True)
 
 
+def dse_iter_bytes(data: bytes, slice_size, start=0, end=None):
+    if end is None:
+        end = len(data)
+    for i in range(start, end, slice_size):
+        yield data[i: i + slice_size]
+
+
 class DseAutoString:
     """Utility base class, that implements convenient __str__ and __repr__ based on object attributes."""
 

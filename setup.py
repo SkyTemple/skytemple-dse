@@ -20,6 +20,13 @@ sf2_cute = Extension('skytemple_dse.sf2._sf2cute',
 )
 
 
+ppmdu_adpcm = Extension('skytemple_dse._ppmdu_adpcm',
+    sources=list(glob('swig/src_ppmdu_adpcm/*.cpp')) + ['swig/ppmdu_adpcm_wrap.cxx'],
+    language='c++',
+    extra_compile_args=['-fPIC', '-std=c++20'],
+)
+
+
 setup(
     name='skytemple-dse',
     version=__version__,
@@ -33,7 +40,7 @@ setup(
         'sf2utils >= 0.9.0'
     ],
     ext_modules=[
-        sf2_cute
+        sf2_cute, ppmdu_adpcm
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

@@ -16,6 +16,7 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Union, Optional, List
 
+from skytemple_dse.dse.swdl.pcmd import SwdlPcmd
 from skytemple_dse.util import *
 
 
@@ -24,6 +25,16 @@ class SampleFormatConsts:
     PCM_16BIT = 0x0100
     ADPCM_4BIT = 0x0200
     PSG = 0x0300  # possibly
+
+
+class SwdlPcmdReference:
+    def __init__(self, pcmd: SwdlPcmd, offset: int, length: int):
+        self.pcmd = pcmd
+        self.offset = offset
+        self.length = length
+
+    def __bytes__(self):
+        return bytes(self.pcmd.chunk_data[self.offset:self.offset+self.length])
 
 
 LEN_SAMPLE_INFO_ENTRY = 0x40
@@ -54,7 +65,7 @@ class SwdlSampleInfoTblEntry(DseAutoString):
         self.unk13 = dse_read_uintle(data, 0x1C, 4)
         self.sample_rate = dse_read_uintle(data, 0x20, 4)
         # Read sample data later into this model
-        self.sample: Optional[bytes] = None
+        self.sample: Optional[Union[bytes, SwdlPcmdReference]] = None
         self._sample_pos = dse_read_uintle(data, 0x24, 4)
         self.loop_begin_pos = dse_read_uintle(data, 0x28, 4)  # (For ADPCM samples, the 4 bytes preamble is counted in the loopbeg!)
         self.loop_length = dse_read_uintle(data, 0x2C, 4)
@@ -76,7 +87,7 @@ class SwdlSampleInfoTblEntry(DseAutoString):
 
     @property
     def sample_length(self):
-        return self.loop_begin_pos + self.loop_length
+        return (self.loop_begin_pos + self.loop_length) * 4
 
     def get_initial_sample_pos(self):
         return self._sample_pos

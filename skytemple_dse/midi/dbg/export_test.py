@@ -34,15 +34,10 @@ os.makedirs(output_dir, exist_ok=True)
 rom = NintendoDSRom.fromFile(os.path.join(base_dir, 'skyworkcopy.nds'))
 
 for filename in get_files_from_rom_with_extension(rom, 'smd'):
-    try:
-        if not filename.startswith("SOUND"):
-            continue
-        print(filename)
-        model = Smdl(rom.getFileByName(filename))
-    except:
-        print("Skipped (read error).")
+    if not filename.startswith("SOUND"):
         continue
-        #traceback.print_exc()
+    print(filename)
+    model = Smdl(rom.getFileByName(filename))
 
     midi = smdl_to_midi(model)
     print("-> " + midi.filename)

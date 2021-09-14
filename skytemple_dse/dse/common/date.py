@@ -14,7 +14,9 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-from skytemple_dse.util import DseAutoString, dse_read_uintle
+from datetime import datetime
+
+from skytemple_dse.util import DseAutoString, dse_read_uintle, dse_write_uintle
 
 
 class DseDate(DseAutoString):
@@ -38,3 +40,27 @@ class DseDate(DseAutoString):
             dse_read_uintle(data, 0x06, 1),
             dse_read_uintle(data, 0x07, 1)
         )
+
+    @classmethod
+    def now(cls):
+        date = datetime.now()
+        return cls(
+            date.year,
+            date.month,
+            date.day,
+            date.hour,
+            date.minute,
+            date.second,
+            0
+        )
+
+    def to_bytes(self):
+        buffer = bytearray(8)
+        dse_write_uintle(buffer, self.year, 0x00, 2),
+        dse_write_uintle(buffer, self.month, 0x02, 1),
+        dse_write_uintle(buffer, self.day, 0x03, 1),
+        dse_write_uintle(buffer, self.hour, 0x04, 1),
+        dse_write_uintle(buffer, self.minute, 0x05, 1),
+        dse_write_uintle(buffer, self.second, 0x06, 1),
+        dse_write_uintle(buffer, self.centisecond, 0x07, 1)
+        return buffer

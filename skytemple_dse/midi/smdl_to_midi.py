@@ -74,7 +74,7 @@ def _read_note(event: SmdlEventPlayNote, track: TimedContainer, state: MidiWrite
     track.append(state.tick_current, Message('note_on', note=midi_note, channel=state.channel, velocity=event.velocity))
     track.append(off_time, Message('note_off', note=midi_note, channel=state.channel, velocity=event.velocity))
 
-    state.oct_current = state.oct_current + event.octave_mod
+    #state.oct_current = state.oct_current + event.octave_mod
     state.last_note_len = n_length
 
 
@@ -135,6 +135,12 @@ def _read_wait_event(event: SmdlEventSpecial, track: TimedContainer, state: Midi
         wait_time = event.params[1]
         wait_time <<= 8
         wait_time |= event.params[0] & 0xFF
+    elif event.op == SmdlSpecialOpCode.WAIT_3BYTE:
+        wait_time = event.params[2]
+        wait_time <<= 8
+        wait_time = event.params[1]
+        wait_time <<= 8
+        wait_time |= event.params[0] & 0xFF
     elif event.op == SmdlSpecialOpCode.WAIT_ADD:
         wait_time = state.last_wait_time + event.params[0]
     elif event.op == SmdlSpecialOpCode.WAIT_AGAIN:
@@ -149,6 +155,11 @@ def _read_unknown_event(event: SmdlEventSpecial, track: TimedContainer, state: M
     for p in event.params:
         params += f"0x{p:02x} "
     track.append(state.tick_current, MetaMessage('marker', text=f'UNK 0x{event.op.value:02x} {params}'))
+
+
+def _read_header_event(event: SmdlEventSpecial, track: TimedContainer, state: MidiWriteState):
+    i = 2 if event.op == SmdlSpecialOpCode.SET_HEADER2 else 1
+    track.append(state.tick_current, MetaMessage('marker', text=f'HEADER{i} {event.params[0]}'))
 
 
 def smdl_to_midi(smdl: Smdl) -> MidiFile:
@@ -189,10 +200,16 @@ def smdl_to_midi(smdl: Smdl) -> MidiFile:
                     _read_wait_event(event, timed_track, state)
                 elif event.op == SmdlSpecialOpCode.WAIT_2BYTE:
                     _read_wait_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.WAIT_3BYTE:
+                    _read_wait_event(event, timed_track, state)
                 elif event.op == SmdlSpecialOpCode.WAIT_ADD:
                     _read_wait_event(event, timed_track, state)
                 elif event.op == SmdlSpecialOpCode.WAIT_AGAIN:
                     _read_wait_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_HEADER1:
+                    _read_header_event(event, timed_track, state)
+                elif event.op == SmdlSpecialOpCode.SET_HEADER2:
+                    _read_header_event(event, timed_track, state)
                 else:
                     _read_unknown_event(event, timed_track, state)
 
