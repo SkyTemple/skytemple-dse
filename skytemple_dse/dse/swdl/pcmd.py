@@ -28,7 +28,7 @@ class SwdlPcmd:
         len_chunk_data = dse_read_uintle(data, 0x0C, 4)
         self._length = 0x10 + len_chunk_data
         assert len(data) >= self._length, "Data is not valid SWDL PCMD"
-        self.chunk_data = data[0x10:self._length]
+        self.chunk_data = bytes(data[0x10:self._length])
 
     def get_initial_length(self):
         return self._length
