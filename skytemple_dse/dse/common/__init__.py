@@ -14,4 +14,17 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
+from abc import ABC, abstractmethod
 
+
+class HasId(ABC):
+    def __init__(self, id):
+        self.id = id
+
+    @abstractmethod
+    def equals_without_id(self, other):
+        """Like __eq__ but ignores id."""
+        pass
+
+    def __eq__(self, other):
+        return self.equals_without_id(other) and self.id == other.id

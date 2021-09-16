@@ -64,3 +64,8 @@ class DseDate(DseAutoString):
         dse_write_uintle(buffer, self.second, 0x06, 1),
         dse_write_uintle(buffer, self.centisecond, 0x07, 1)
         return buffer
+
+    def __eq__(self, other):
+        if not isinstance(other, DseDate):
+            return False
+        return vars(self) == vars(other)

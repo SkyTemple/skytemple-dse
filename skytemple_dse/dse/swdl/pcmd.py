@@ -32,3 +32,22 @@ class SwdlPcmd:
 
     def get_initial_length(self):
         return self._length
+
+    def to_bytes(self) -> bytes:
+        buffer = bytearray(b'pcmd\0\0\x15\x04\x10\0\0\0\0\0\0\0')
+        dse_write_uintle(buffer, len(self.chunk_data), 0x0C, 4)
+
+        padding = bytes()
+        if len(self.chunk_data) % 16 != 0:
+            # TODO: Unknown what this magic value means
+            padding += bytes([0xb4, 0x03, 0, 0, 0x68, 0x01, 0x51, 0x04])
+        # TODO: is this ok???
+        if (len(self.chunk_data) + len(padding)) % 16 != 0:
+            padding += bytes([0x00] * (16 - ((len(self.chunk_data) + len(padding)) % 16)))
+
+        return buffer + self.chunk_data + padding
+
+    def __eq__(self, other):
+        if not isinstance(other, SwdlPcmd):
+            return False
+        return self.chunk_data == other.chunk_data

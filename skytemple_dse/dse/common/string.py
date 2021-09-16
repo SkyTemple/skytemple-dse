@@ -47,14 +47,19 @@ class DseFilenameString(str):
         assert rest == bytes([0x00] + [0xAA] * (len(rest) - 1)) or rest == bytes([0x00] + [0xFF] * (len(rest) - 1)), "Invalid DseFilenameString padding"
         return cls(string)
 
-    def to_bytes(self):
+    def to_bytes(self, end_byte_0xaa=False):
         if len(self.string) > 0xF:
             raise ValueError("DSE filename too long to convert.")
         data = bytearray(16)
         encoded = bytes(self.string, 'ascii')
         data[:len(encoded)] = encoded
-        data[len(encoded) + 1:16] = [0xFF] * (15 - len(encoded))
+        data[len(encoded) + 1:16] = [0xFF if not end_byte_0xaa else 0xAA] * (15 - len(encoded))
         return data
+
+    def __eq__(self, other):
+        if not isinstance(other, DseFilenameString):
+            return False
+        return vars(self) == vars(other)
 
     def __str__(self):
         return self.string

@@ -15,7 +15,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum
-from typing import Union
+from typing import Union, List, Optional
 
 from skytemple_dse.util import *
 
@@ -54,6 +54,25 @@ class SwdlLfoEntry(DseAutoString):
         self.delay = dse_read_uintle(data, 0x0A, 2)
         self.unk32 = dse_read_uintle(data, 0x0C, 2)
         self.unk33 = dse_read_uintle(data, 0x0E, 2)
+
+    def to_bytes(self):
+        data = bytearray(16)
+        dse_write_uintle(data, self.unk34, 0x00)
+        dse_write_uintle(data, self.unk52, 0x01)
+        dse_write_sintle(data, self.dest.value, 0x02)
+        dse_write_sintle(data, self.wshape.value, 0x03)
+        dse_write_uintle(data, self.rate, 0x04, 2)
+        dse_write_uintle(data, self.unk29, 0x06, 2)
+        dse_write_uintle(data, self.depth, 0x08, 2)
+        dse_write_uintle(data, self.delay, 0x0A, 2)
+        dse_write_uintle(data, self.unk32, 0x0C, 2)
+        dse_write_uintle(data, self.unk33, 0x0E, 2)
+        return data
+
+    def __eq__(self, other):
+        if not isinstance(other, SwdlLfoEntry):
+            return False
+        return vars(self) == vars(other)
 
 
 class SwdlSplitEntry(DseAutoString):
@@ -99,9 +118,60 @@ class SwdlSplitEntry(DseAutoString):
         self.release = dse_read_sintle(data, 0x2E)
         self.unk53 = dse_read_sintle(data, 0x2F)
 
+    def to_bytes(self):
+        data = bytearray(0x30)
+        dse_write_uintle(data, self.id, 0x01)
+        dse_write_uintle(data, self.unk11, 0x02)
+        dse_write_uintle(data, self.unk25, 0x03)
+        dse_write_sintle(data, self.lowkey, 0x04)
+        dse_write_sintle(data, self.hikey, 0x05)
+        dse_write_sintle(data, self.lowkey, 0x06)
+        dse_write_sintle(data, self.hikey, 0x07)
+        dse_write_sintle(data, self.lolevel, 0x08)
+        dse_write_sintle(data, self.hilevel, 0x09)
+        dse_write_sintle(data, self.lolevel, 0x0A)
+        dse_write_sintle(data, self.hilevel, 0x0B)
+        dse_write_sintle(data, self.unk16, 0x0C, 4)
+        dse_write_sintle(data, self.unk17, 0x10, 2)
+        dse_write_uintle(data, self.sample_id, 0x12, 2)
+        dse_write_sintle(data, self.ftune, 0x14)
+        dse_write_sintle(data, self.ctune, 0x15)
+        dse_write_sintle(data, self.rootkey, 0x16)
+        dse_write_sintle(data, self.ktps, 0x17)
+        dse_write_sintle(data, self.sample_volume, 0x18)
+        dse_write_sintle(data, self.sample_pan, 0x19)
+        dse_write_sintle(data, self.keygroup_id, 0x1A)
+        dse_write_uintle(data, self.unk22, 0x1B, 2)
+        dse_write_uintle(data, self.unk23, 0x1C, 2)
+        dse_write_uintle(data, self.unk24, 0x1E, 2)
+
+        dse_write_uintle(data, self.envelope, 0x20)
+        dse_write_uintle(data, self.envelope_multiplier, 0x21)
+        dse_write_uintle(data, self.unk37, 0x22)
+        dse_write_uintle(data, self.unk38, 0x23)
+        dse_write_uintle(data, self.unk39, 0x24, 2)
+        dse_write_uintle(data, self.unk40, 0x26, 2)
+        dse_write_sintle(data, self.attack_volume, 0x28)
+        dse_write_sintle(data, self.attack, 0x29)
+        dse_write_sintle(data, self.decay, 0x2A)
+        dse_write_sintle(data, self.sustain, 0x2B)
+        dse_write_sintle(data, self.hold, 0x2C)
+        dse_write_sintle(data, self.decay2, 0x2D)
+        dse_write_sintle(data, self.release, 0x2E)
+        dse_write_sintle(data, self.unk53, 0x2F)
+
+        return data
+
+    def __eq__(self, other):
+        if not isinstance(other, SwdlSplitEntry):
+            return False
+        return vars(self) == vars(other)
+
 
 class SwdlProgramTable(DseAutoString):
-    def __init__(self, data: Union[bytes, memoryview], _assertId: int):
+    def __init__(self, data: Optional[Union[bytes, memoryview]], _assertId: Optional[int]):
+        if data is None:
+            return
         self.id = dse_read_uintle(data, 0x00, 2)
         assert self.id == _assertId, "Data is not valid WDL PRGI Program Entry"
         number_splits = dse_read_uintle(data, 0x02, 2)
@@ -113,6 +183,7 @@ class SwdlProgramTable(DseAutoString):
         self.unk5 = dse_read_uintle(data, 0x0A)
         number_lfos = dse_read_uintle(data, 0x0B)
         # TODO: ????????? - 0x0C should be delimiter but it seems to just be any of these two?
+        self._delimiter = dse_read_uintle(data, 0x0C)
         delimiter = (0x00, 0xAA)
         self.unk7 = dse_read_uintle(data, 0x0D)
         self.unk8 = dse_read_uintle(data, 0x0E)
@@ -129,6 +200,47 @@ class SwdlProgramTable(DseAutoString):
         for off in range(end_lfos + 16, end_splits, LEN_SPLITS):
             self.splits.append(SwdlSplitEntry(data[off:off + LEN_SPLITS]))
 
+    def get_initial_delimiter(self):
+        return self._delimiter
+
+    def copy(self, new_wavi_ids: List[int] = None, new_kgrp_ids: List[int] = None) -> 'SwdlProgramTable':
+        n = SwdlProgramTable(None, None)
+        vars(n).update(vars(self))
+        if new_wavi_ids is not None:
+            for split, wid in zip(n.splits, new_wavi_ids):
+                split.sample_id = wid
+        if new_kgrp_ids is not None:
+            for split, kid in zip(n.splits, new_kgrp_ids):
+                split.keygroup_id = kid
+        return n
+
+    def to_bytes(self, delimiter=0x00):
+        data = bytearray(0x10)
+        dse_write_uintle(data, self.id, 0x00, 2)
+        dse_write_uintle(data, len(self.splits), 0x02, 2)
+        dse_write_sintle(data, self.prg_volume, 0x04)
+        dse_write_sintle(data, self.prg_pan, 0x05)
+        dse_write_uintle(data, self.unk3, 0x06)
+        dse_write_uintle(data, self.that_f_byte, 0x07)
+        dse_write_uintle(data, self.unk4, 0x08, 2)
+        dse_write_uintle(data, self.unk5, 0x0A, 2)
+        dse_write_uintle(data, len(self.lfos), 0x0B)
+        dse_write_uintle(data, delimiter, 0x0C)
+        dse_write_uintle(data, self.unk7, 0x0D)
+        dse_write_uintle(data, self.unk8, 0x0E)
+        dse_write_uintle(data, self.unk9, 0x0F)
+        for lfo in self.lfos:
+            data += lfo.to_bytes()
+        data += bytes([delimiter] * 16)
+        for split in self.splits:
+            data += split.to_bytes()
+        return data
+
+    def __eq__(self, other):
+        if not isinstance(other, SwdlProgramTable):
+            return False
+        return vars(self) == vars(other)
+
 
 class SwdlPrgi:
     def __init__(self, data: Union[bytes, memoryview], number_slots: int):
@@ -140,7 +252,7 @@ class SwdlPrgi:
 
         self._length = 0x10 + len_chunk_data
 
-        self.program_table = []
+        self.program_table: List[Optional[SwdlProgramTable]] = []
         for idx, seek in enumerate(range(0, number_slots * 2, 2)):
             pnt = dse_read_uintle(data, 0x10 + seek, 2)
             assert pnt < len_chunk_data, "Data is not valid SWDL PRGI"
@@ -148,6 +260,23 @@ class SwdlPrgi:
                 self.program_table.append(None)
             else:
                 self.program_table.append(SwdlProgramTable(data[0x10 + pnt:], _assertId=idx))
+
+    def to_bytes(self) -> bytes:
+        chunk = bytearray(len(self.program_table) * 2)
+        # Padding after TOC
+        if len(chunk) % 16 != 0:
+            chunk += bytes([0x00] * (16 - (len(chunk) % 16)))
+        for i, prg in enumerate(self.program_table):
+            if prg is not None:
+                assert prg.id == i
+                dse_write_uintle(chunk, len(chunk), i * 2, 2)
+                chunk += prg.to_bytes(prg.get_initial_delimiter())
+            else:
+                dse_write_uintle(chunk, 0, i * 2, 2)
+
+        buffer = bytearray(b'prgi\0\0\x15\x04\x10\0\0\0\0\0\0\0')
+        dse_write_uintle(buffer, len(chunk), 0x0C, 4)
+        return buffer + chunk
 
     def __str__(self):
         chunks = ""
@@ -158,3 +287,9 @@ class SwdlPrgi:
 
     def get_initial_length(self):
         return self._length
+
+    def __eq__(self, other):
+        if not isinstance(other, SwdlPrgi):
+            return False
+        return self.program_table == other.program_table
+
