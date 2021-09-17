@@ -65,7 +65,9 @@ class SwdlHeader(DseAutoString):
         _in_length = dse_read_uintle(data, 0x08, 4)
         assert len(data) == _in_length, "Data is not valid SWDL"
         self.version = dse_read_uintle(data, 0x0C, 2)
+        # HEADER2 VALUE OF SMDL???
         self.unk1 = dse_read_uintle(data, 0x0E, 1)
+        # HEADER1 VALUE OF SMDL???
         self.unk2 = dse_read_uintle(data, 0x0F, 1)
         assert data[0x10:0x18] == bytes(8), "Data is not valid SWDL"
         self.modified_date = DseDate.from_bytes(data[0x18:0x20])

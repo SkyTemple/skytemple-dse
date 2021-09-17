@@ -30,7 +30,7 @@ from skytemple_dse.soundvault.vault import Vault
 base_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
 output_dir = os.path.join(os.path.dirname(__file__), 'dbg_output')
 os.makedirs(output_dir, exist_ok=True)
-rom = NintendoDSRom.fromFile(os.path.join(base_dir, 'skyworkcopy.nds'))
+rom = NintendoDSRom.fromFile(os.path.join(base_dir, 'skyworkcopy_us_unpatched.nds'))
 
 # Build vault
 main_bank: Swdl = None

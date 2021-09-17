@@ -376,7 +376,7 @@ class SmdlEventSpecial(DseAutoString):
         elif self.op == SmdlSpecialOpCode.WAIT_3BYTE:
             amt |= ((self.params[2] & 0xFF) << 16)
             amt |= (self.params[1] & 0xFF) << 8
-            return f"WAIT_2BYTE: {amt} ticks"
+            return f"WAIT_3BYTE: {amt} ticks"
         else:
             return self.op.name
 

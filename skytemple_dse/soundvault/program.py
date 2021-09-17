@@ -61,7 +61,7 @@ class Program:
         for src_sample, src_wavi in zip(self.sample_data, self.wavis):
             wavi_id = self._lookup_list(src_wavi, main_bank_swdl.wavi.sample_info_table, ignore_id=True)
             if wavi_id is None:
-                logger.info(f'Had to create a new wavi.')
+                logger.warning(f'Had to create a new wavi.')
                 wavi_id = self._create_new_wavi(main_bank_swdl, src_wavi)
                 modified = True
             src_wavi.id = wavi_id
@@ -72,7 +72,7 @@ class Program:
             if sample_start is None:
                 if not allow_add_samples:
                     raise ValueError("Sample not found in main bank.")
-                logger.info(f'Had to create a new sample.')
+                logger.warning(f'Had to create a new sample.')
                 sample_start = self._create_new_sample(main_bank_swdl, src_sample)
                 modified = True
                 main_bank_swdl.wavi.sample_info_table[wavi_id].force_set_sample_pos(sample_start)
@@ -142,7 +142,7 @@ class Program:
     @staticmethod
     def _lookup_bytes(needle: bytes, haystack: bytes) -> Optional[int]:
         fresult = haystack.find(needle)
-        return fresult if fresult > 0 else None
+        return fresult if fresult >= 0 else None
 
     @staticmethod
     def _create_new_wavi(swdl: Swdl, wavi: SwdlSampleInfoTblEntry) -> int:

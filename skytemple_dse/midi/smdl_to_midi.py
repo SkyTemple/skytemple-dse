@@ -74,7 +74,7 @@ def _read_note(event: SmdlEventPlayNote, track: TimedContainer, state: MidiWrite
     track.append(state.tick_current, Message('note_on', note=midi_note, channel=state.channel, velocity=event.velocity))
     track.append(off_time, Message('note_off', note=midi_note, channel=state.channel, velocity=event.velocity))
 
-    #state.oct_current = state.oct_current + event.octave_mod
+    state.oct_current = state.oct_current + event.octave_mod
     state.last_note_len = n_length
 
 

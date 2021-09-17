@@ -85,10 +85,12 @@ class Vault:
                         wavi.force_set_sample_pos(master_bank.wavi.sample_info_table[s.sample_id].get_initial_sample_pos())
                         wavis.append(wavi)
                     for w in wavis:
-                        sample_data.append(self._extract_sample_from_master(
+                        smpl = self._extract_sample_from_master(
                             master_bank.pcmd,
                             w.get_initial_sample_pos(), w.sample_length
-                        ))
+                        )
+                        assert smpl in master_bank.pcmd.chunk_data
+                        sample_data.append(smpl)
                     programs.append(Program(
                         instrument_name, name,
                         sample_data, prg, kgrps, wavis,

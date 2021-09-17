@@ -43,7 +43,9 @@ class SwdlWshape(Enum):
 
 
 class SwdlLfoEntry(DseAutoString):
-    def __init__(self, data: Union[bytes, memoryview]):
+    def __init__(self, data: Optional[Union[bytes, memoryview]]):
+        if data is None:
+            return
         self.unk34 = dse_read_uintle(data, 0x00)
         self.unk52 = dse_read_uintle(data, 0x01)
         self.dest = SwdlLfoDest(dse_read_uintle(data, 0x02))
@@ -54,6 +56,23 @@ class SwdlLfoEntry(DseAutoString):
         self.delay = dse_read_uintle(data, 0x0A, 2)
         self.unk32 = dse_read_uintle(data, 0x0C, 2)
         self.unk33 = dse_read_uintle(data, 0x0E, 2)
+
+    @classmethod
+    def new(cls, unk34, unk52, dest, wshape, rate, unk29, depth, delay, unk32, unk33):
+        n = SwdlLfoEntry(None)
+        vars(n).update({
+            'unk34': unk34,
+            'unk52': unk52,
+            'dest': dest,
+            'wshape': wshape,
+            'rate': rate,
+            'unk29': unk29,
+            'depth': depth,
+            'delay': delay,
+            'unk32': unk32,
+            'unk33': unk33,
+        })
+        return n
 
     def to_bytes(self):
         data = bytearray(16)
@@ -76,7 +95,9 @@ class SwdlLfoEntry(DseAutoString):
 
 
 class SwdlSplitEntry(DseAutoString):
-    def __init__(self, data: Union[bytes, memoryview]):
+    def __init__(self, data: Optional[Union[bytes, memoryview]]):
+        if data is None:
+            return
         assert data[0] == 0, "Data is not valid WDL PRG Split Entry"
         self.id = dse_read_uintle(data, 0x01)
         self.unk11 = dse_read_uintle(data, 0x02)
@@ -117,6 +138,49 @@ class SwdlSplitEntry(DseAutoString):
         self.decay2 = dse_read_sintle(data, 0x2D)
         self.release = dse_read_sintle(data, 0x2E)
         self.unk53 = dse_read_sintle(data, 0x2F)
+
+    @classmethod
+    def new(cls, id, unk11, unk25, lowkey, hikey, lolevel, hilevel, unk16, unk17, sample_id, ftune, ctune, rootkey,
+            ktps, sample_volume, sample_pan, keygroup_id, unk22, unk23, unk24, envelope, envelope_multiplier, unk37,
+            unk38, unk39, unk40, attack_volume, attack, decay, sustain, hold, decay2, release, unk53):
+        n = SwdlSplitEntry(None)
+        vars(n).update({
+            'id': id,
+            'unk11': unk11,
+            'unk25': unk25,
+            'lowkey': lowkey,
+            'hikey': hikey,
+            'lolevel': lolevel,
+            'hilevel': hilevel,
+            'unk16': unk16,
+            'unk17': unk17,
+            'sample_id': sample_id,
+            'ftune': ftune,
+            'ctune': ctune,
+            'rootkey': rootkey,
+            'ktps': ktps,
+            'sample_volume': sample_volume,
+            'sample_pan': sample_pan,
+            'keygroup_id': keygroup_id,
+            'unk22': unk22,
+            'unk23': unk23,
+            'unk24': unk24,
+            'envelope': envelope,
+            'envelope_multiplier': envelope_multiplier,
+            'unk37': unk37,
+            'unk38': unk38,
+            'unk39': unk39,
+            'unk40': unk40,
+            'attack_volume': attack_volume,
+            'attack': attack,
+            'decay': decay,
+            'sustain': sustain,
+            'hold': hold,
+            'decay2': decay2,
+            'release': release,
+            'unk53': unk53
+        })
+        return n
 
     def to_bytes(self):
         data = bytearray(0x30)
@@ -199,6 +263,26 @@ class SwdlProgramTable(DseAutoString):
         end_splits = end_lfos + 16 + number_splits * LEN_SPLITS
         for off in range(end_lfos + 16, end_splits, LEN_SPLITS):
             self.splits.append(SwdlSplitEntry(data[off:off + LEN_SPLITS]))
+
+    @classmethod
+    def new(cls, id, prg_volume, prg_pan, unk3, that_f_byte, unk4, unk5, delimiter, unk7, unk8, unk9, lfos, splits):
+        n = SwdlProgramTable(None, None)
+        vars(n).update({
+            'id': id,
+            'prg_volume': prg_volume,
+            'prg_pan': prg_pan,
+            'unk3': unk3,
+            'that_f_byte': that_f_byte,
+            'unk4': unk4,
+            'unk5': unk5,
+            '_delimiter': delimiter,
+            'unk7': unk7,
+            'unk8': unk8,
+            'unk9': unk9,
+            'lfos': lfos,
+            'splits': splits
+        })
+        return n
 
     def get_initial_delimiter(self):
         return self._delimiter

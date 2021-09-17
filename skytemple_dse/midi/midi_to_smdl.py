@@ -25,8 +25,6 @@ from skytemple_dse.dse.smdl.model import Smdl, SmdlTrack, SmdlEventPlayNote, Smd
     SmdlNote
 PATTERN_MATCH_MARKER = re.compile(r'UNK 0x([0-9a-fA-F][0-9a-fA-F]?) (?:0x([0-9a-fA-F][0-9a-fA-F]?))?' + \
                                   ('(?: 0x([0-9a-fA-F][0-9a-fA-F]?))?' * 7) + ' ?')
-HEADER1_DEFAULT = 121
-HEADER2_DEFAULT = 65
 EXPRESSION_DEFAULT = 113
 
 
@@ -81,13 +79,16 @@ def _correct_octave(smdl_track: SmdlTrack, midi_note: int, s: MidiExportState):
 
 def _insert_pause(smdl_track: SmdlTrack, event: BaseMessage, s: MidiExportState):
     pause_in_ticks = event.abs_time - s.previous_tick
-    if pause_in_ticks > 0xFFFFFF:
-        # TODO: We could technically still encode this.
-        raise ValueError("The MIDI contains a VERY long pause, this is currently not supported.")
-    elif pause_in_ticks > 0xFFFF:
-        params = list(int.to_bytes(pause_in_ticks, 3, byteorder='little', signed=False))
-        smdl_track.events.append(SmdlEventSpecial(SmdlSpecialOpCode.WAIT_3BYTE, params=params))
-    elif pause_in_ticks > 0xFF:
+    #if pause_in_ticks > 0xFFFFFF:
+    #    # TODO: We could technically still encode this.
+    #    raise ValueError("The MIDI contains a VERY long pause, this is currently not supported.")
+    #elif pause_in_ticks > 0xFFFF:
+    #    params = list(int.to_bytes(pause_in_ticks, 3, byteorder='little', signed=False))
+    #    smdl_track.events.append(SmdlEventSpecial(SmdlSpecialOpCode.WAIT_3BYTE, params=params))
+    while pause_in_ticks > 0xFFFF:
+        smdl_track.events.append(SmdlEventSpecial(SmdlSpecialOpCode.WAIT_2BYTE, params=[0xFF, 0xFF]))
+        pause_in_ticks -= 0xFFFF
+    if pause_in_ticks > 0xFF:
         params = list(int.to_bytes(pause_in_ticks, 2, byteorder='little', signed=False))
         smdl_track.events.append(SmdlEventSpecial(SmdlSpecialOpCode.WAIT_2BYTE, params=params))
     elif pause_in_ticks > 0:
@@ -102,6 +103,8 @@ def _read_note(smdl_track: SmdlTrack, event_on: Message, event_off: Message, s: 
     hold_duration = event_off.abs_time - event_on.abs_time
     _insert_pause(smdl_track, event_on, s)
     octave_mod = _correct_octave(smdl_track, event_on.note, s)
+    s.current_octave += octave_mod
+    s.last_note_hold_time = hold_duration
     smdl_track.events.append(SmdlEventPlayNote(
         event_on.velocity, octave_mod, SmdlNote(event_on.note % 12), hold_duration
     ))
@@ -152,7 +155,7 @@ def _read_pitchwheel(smdl_track: SmdlTrack, event: Message, s: MidiExportState):
 
 def _read_marker(smdl_track: SmdlTrack, event: MetaMessage, s: MidiExportState, warnings: List[SmdlConvertWarning]):
     _insert_pause(smdl_track, event, s)
-    if 'loop' in event.text.lower():
+    if 'loop' in event.text.lower() and event.text.lower() != 'loopstart':
         smdl_track.events.append(SmdlEventSpecial(
             SmdlSpecialOpCode.LOOP_POINT, params=[]
         ))
@@ -216,7 +219,8 @@ def times_to_absolute(msgs: Iterable[BaseMessage]) -> List[BaseMessage]:
     return l
 
 
-def midi_to_smdl(midi: MidiFile) -> Tuple[Smdl, List[SmdlConvertWarning]]:
+# TODO: Convert using Channels, not Tracks
+def midi_to_smdl(midi: MidiFile, header1val, header2val) -> Tuple[Smdl, List[SmdlConvertWarning]]:
     smdl = Smdl.new(midi.filename.split('/')[-1][0:15])
     warnings = []
 
@@ -247,6 +251,8 @@ def midi_to_smdl(midi: MidiFile) -> Tuple[Smdl, List[SmdlConvertWarning]]:
                 # We allow duplicate channel 0 in this case
                 pass
             else:
+                if len(free_channels) < 1:
+                    raise ValueError("The MIDI uses too many channels. Please limit to 16.")
                 channel = free_channels.pop(0)
         else:
             free_channels.remove(channel)
@@ -289,10 +295,10 @@ def midi_to_smdl(midi: MidiFile) -> Tuple[Smdl, List[SmdlConvertWarning]]:
                         if not isinstance(evt, MetaMessage) or evt.type != 'marker' or not evt.text.startswith('HEADER1 '):
                             warnings.append(SmdlConvertWarning(track_id, None, SmdlConvertWarningReason.HEADER_EVENTS_AUTOGEN))
                             smdl_track.events.append(SmdlEventSpecial(
-                                SmdlSpecialOpCode.SET_HEADER1, params=[HEADER1_DEFAULT]
+                                SmdlSpecialOpCode.SET_HEADER1, params=[header1val]
                             ))
                             smdl_track.events.append(SmdlEventSpecial(
-                                SmdlSpecialOpCode.SET_HEADER2, params=[HEADER2_DEFAULT]
+                                SmdlSpecialOpCode.SET_HEADER2, params=[header2val]
                             ))
                 elif event.type == 'pitchwheel':
                     _read_pitchwheel(smdl_track, event, s)

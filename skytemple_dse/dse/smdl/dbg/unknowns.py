@@ -25,7 +25,7 @@ from ndspy.rom import NintendoDSRom
 # noinspection PyUnresolvedReferences
 from skytemple_files.common.util import get_files_from_rom_with_extension
 
-from skytemple_dse.dse.smdl.model import Smdl
+from skytemple_dse.dse.smdl.model import Smdl, SmdlEventSpecial, SmdlSpecialOpCode
 
 base_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..')
 output_dir = os.path.join(os.path.dirname(__file__), 'dbg_output')
@@ -39,4 +39,13 @@ for filename in get_files_from_rom_with_extension(rom, 'smd'):
     print(filename)
     model = Smdl(rom.getFileByName(filename))
 
-    print(model.header.file_name)
+    for track in model.tracks:
+        for event in track.events:
+            if isinstance(event, SmdlEventSpecial) and event.op == SmdlSpecialOpCode.SET_HEADER1:
+                print('h1', event.params[0])
+            if isinstance(event, SmdlEventSpecial) and event.op == SmdlSpecialOpCode.SET_HEADER2:
+                print('h2', event.params[0])
+            if isinstance(event, SmdlEventSpecial) and event.op == SmdlSpecialOpCode.SET_SAMPLE:
+                print('sm', event.params[0])
+            if isinstance(event, SmdlEventSpecial) and event.op == SmdlSpecialOpCode.SET_XPRESS:
+                print('ex', event.params[0])
