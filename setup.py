@@ -12,6 +12,16 @@ with open(path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
 # END README read-in
 
 
+def get_resources(file_exts):
+    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'skytemple_files', '_resources')
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            if any(filename.endswith(file_ext) for file_ext in file_exts):
+                paths.append(os.path.join('_resources', os.path.relpath(os.path.join('..', path, filename), directory)))
+    return paths
+
+
 sf2_cute = Extension('skytemple_dse.sf2._sf2cute',
     include_dirs=['swig/src/include'],
     sources=list(glob('swig/src/src/sf2cute/*.cpp')) + ['swig/sf2cute_wrap.cxx'],
@@ -31,6 +41,7 @@ setup(
     name='skytemple-dse',
     version=__version__,
     packages=find_packages(),
+    package_data={'skytemple_dse': get_resources(['.csv'])},
     description='Python library for working with a specific version of compiled DSE sound engine files',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -49,6 +60,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 3.9',
+            'Programming Language :: Python :: 3.10',
     ],
 )

@@ -234,6 +234,7 @@ class SwdlSplitEntry(DseAutoString):
 
 class SwdlProgramTable(DseAutoString):
     def __init__(self, data: Optional[Union[bytes, memoryview]], _assertId: Optional[int]):
+        self._delimiter = 0xAA
         if data is None:
             return
         self.id = dse_read_uintle(data, 0x00, 2)

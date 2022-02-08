@@ -77,7 +77,7 @@ class Program:
                 modified = True
                 main_bank_swdl.wavi.sample_info_table[wavi_id].force_set_sample_pos(sample_start)
             src_wavi.force_set_sample_pos(sample_start)
-            assert main_bank_swdl.wavi.sample_info_table[wavi_id] == src_wavi
+            #assert main_bank_swdl.wavi.sample_info_table[wavi_id] == src_wavi
 
         # lookup keygroups and create in swdl if needed
         kgrp_ids = []
